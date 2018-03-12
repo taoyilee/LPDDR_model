@@ -18,9 +18,9 @@ module tb;
     // mode registers
     reg                   [7:0] mr1;
     reg                   [7:0] mr2;
-    wire                  [4:0] bl  = 1<<(mr1 & 7);
-    wire                  [3:0] rl = (mr2 & 7) + 2;
-    wire                  [2:0] wl = (rl>>1) + (&rl[2:0]);
+    wire                  [4:0] bl  = 4;
+    wire                  [3:0] rl = 3;
+    wire                  [2:0] wl = 1;
 
     // dq transmit
     reg                         dq_en;
@@ -165,7 +165,6 @@ module tb;
 
     task mode_reg_read;
         input                 [7:0] ma;
-        input                 [7:0] op;
         integer i;
         begin
             cke   <= 1'b1;
@@ -173,11 +172,6 @@ module tb;
             ca    <= #(tck/4) {ma[5:0], 4'h8};
             ca    <= #(3*tck/4) ma[7:6];
             @(negedge ck);
-            dm_fifo[2*(rl + 3)] <= -2;
-            dq_fifo[2*(rl + 3)] <= op;
-            for (i=1; i<4; i=i+1) begin
-                dm_fifo[2*(rl + 3) + i] <= {DM_BITS{1'b1}};
-            end
         end
     endtask
 
@@ -219,8 +213,8 @@ module tb;
         input         [BA_BITS-1:0] ba;
         input                [11:0] c;
         input                       ap;
-        input      [16*DM_BITS-1:0] wdm;
-        input      [16*DQ_BITS-1:0] wdq;
+        input      [4*DM_BITS-1:0] wdm;
+        input      [4*DQ_BITS-1:0] wdq;
         integer i;
         integer dly;
         begin
@@ -327,89 +321,6 @@ module tb;
         end
     endtask
 
-    // read with data verification
-    task read_verify;
-        input         [BA_BITS-1:0] ba;
-        input                [11:0] c;
-        input                       ap;
-        input      [16*DM_BITS-1:0] rdm;
-        input      [16*DQ_BITS-1:0] rdq;
-        integer i;
-        begin
-            read (ba, c, ap);
-            for (i=0; i<bl; i=i+1) begin
-                dm_fifo[2*(rl + 3) + i] <= rdm >> (i*DM_BITS);
-                dq_fifo[2*(rl + 3) + i] <= rdq >> (i*DQ_BITS);
-            end
-        end
-    endtask
-
-    // receiver(s) for data_verify process
-    dqrx dqrx[DQS_BITS-1:0] (ptr_rst_n, dqs, dq, q0, q1, q2, q3, q4, q5, q6, q7, q8, q9, q10, q11, q12, q13, q14, q15);
-
-    // perform data verification as a result of read_verify task call
-    always @(ck) begin:data_verify
-        integer i;
-        integer j;
-        reg [DQ_BITS-1:0] bit_mask;
-        reg [DM_BITS-1:0] dm_temp;
-        reg [DQ_BITS-1:0] dq_temp;
-        
-        for (i = !ck; (i < 2/(2.0 - !ck)); i=i+1) begin
-            if ((dm_fifo[i] === {DM_BITS{1'bx}}) && (dm_fifo[i+2] === {DM_BITS{1'bx}})) begin
-                burst_cntr = 0;
-            end else if (dm_fifo[i] === {DM_BITS{1'bx}}) begin
-                // do nothing
-            end else begin
-
-                dm_temp = dm_fifo[i];
-                for (j=0; j<DQ_BITS; j=j+1) begin
-                    bit_mask[j] = !dm_temp[j/(DQ_BITS/DM_BITS)];
-                end
-
-                case (burst_cntr)
-                    0: dq_temp =  q0;
-                    1: dq_temp =  q1;
-                    2: dq_temp =  q2;
-                    3: dq_temp =  q3;
-                    4: dq_temp =  q4;
-                    5: dq_temp =  q5;
-                    6: dq_temp =  q6;
-                    7: dq_temp =  q7;
-                    8: dq_temp =  q8;
-                    9: dq_temp =  q9;
-                   10: dq_temp =  q10;
-                   11: dq_temp =  q11;
-                   12: dq_temp =  q12;
-                   13: dq_temp =  q13;
-                   14: dq_temp =  q14;
-                   15: dq_temp =  q15;
-                endcase
-                //if ( ((dq_temp & bit_mask) === (dq_fifo[i] & bit_mask)))
-                //    $display ("%m at time %t: INFO: Successful read data compare.  Expected = %h, Actual = %h, Mask = %h, i = %d", $time, dq_fifo[i], dq_temp, bit_mask, burst_cntr);
-                if ((dq_temp & bit_mask) !== (dq_fifo[i] & bit_mask)) begin
-                    $display ("%m at time %t: ERROR: Read data miscompare.  Expected = %h, Actual = %h, Mask = %h, i = %d", $time, dq_fifo[i], dq_temp, bit_mask, burst_cntr);
-                    if (STOP_ON_ERROR) begin
-                        $stop;
-                    end
-                end
-
-                burst_cntr = burst_cntr + 1;
-            end
-        end
-
-        if (ck) begin
-            ptr_rst_n <= (dm_fifo[8] !== {DM_BITS{1'bx}}) || ((dm_fifo[6] !== {DM_BITS{1'bx}}) && (dm_fifo[10] !== {DM_BITS{1'bx}}));
-        end else begin
-            for (i=0; i<=2*CL_MAX+22; i=i+1) begin
-                dm_fifo[i] = dm_fifo[i+2];
-                dq_fifo[i] = dq_fifo[i+2];
-            end
-            dm_fifo[2*CL_MAX+24] = {DM_BITS{1'bx}};
-            dq_fifo[2*CL_MAX+24] = {DQ_BITS{1'bx}};
-        end
-    end
-
     // End-of-test triggered in 'subtest.vh'
     task test_done;
         begin
@@ -419,75 +330,7 @@ module tb;
     endtask
 
     // Test included from external file
-    `include "subtest.vh"
+    `include "subtest.v"
 
 endmodule
 
-module dqrx (
-    ptr_rst_n, dqs, dq, q0, q1, q2, q3, q4, q5, q6, q7, q8, q9, q10, q11, q12, q13, q14, q15
-);
-
-    `include "mobile_ddr2_parameters.vh"
-
-    input  ptr_rst_n;
-    input  dqs;
-    input  [DQ_BITS/DQS_BITS-1:0] dq;
-    output [DQ_BITS/DQS_BITS-1:0] q0;
-    output [DQ_BITS/DQS_BITS-1:0] q1;
-    output [DQ_BITS/DQS_BITS-1:0] q2;
-    output [DQ_BITS/DQS_BITS-1:0] q3;
-    output [DQ_BITS/DQS_BITS-1:0] q4;
-    output [DQ_BITS/DQS_BITS-1:0] q5;
-    output [DQ_BITS/DQS_BITS-1:0] q6;
-    output [DQ_BITS/DQS_BITS-1:0] q7;
-    output [DQ_BITS/DQS_BITS-1:0] q8;
-    output [DQ_BITS/DQS_BITS-1:0] q9;
-    output [DQ_BITS/DQS_BITS-1:0] q10;
-    output [DQ_BITS/DQS_BITS-1:0] q11;
-    output [DQ_BITS/DQS_BITS-1:0] q12;
-    output [DQ_BITS/DQS_BITS-1:0] q13;
-    output [DQ_BITS/DQS_BITS-1:0] q14;
-    output [DQ_BITS/DQS_BITS-1:0] q15;
-
-    reg ptr_rst_dly_n;
-    always @(posedge ptr_rst_n) ptr_rst_dly_n <= #(TDQSCK + TDQSQ) ptr_rst_n;
-    always @(negedge ptr_rst_n) ptr_rst_dly_n <= #(TDQSCK_MAX + TDQSQ + 2) ptr_rst_n;
-
-    reg dqs_dly;
-    always @(dqs) dqs_dly <= #(TDQSQ + 1) dqs;
-
-    reg [3:0] ptr;
-    reg [DQ_BITS/DQS_BITS-1:0] q [15:0];
-
-    always @(negedge ptr_rst_dly_n or posedge dqs_dly or negedge dqs_dly) begin
-        if (!ptr_rst_dly_n) begin
-            ptr <= 0;
-        end else if (dqs_dly || ptr) begin
-            q[ptr] <= dq;
-            ptr <= ptr + 1;
-        end
-    end
-
-    assign q0  = q[0];
-    assign q1  = q[1];
-    assign q2  = q[2];
-    assign q3  = q[3];
-    assign q4  = q[4];
-    assign q5  = q[5];
-    assign q6  = q[6];
-    assign q7  = q[7];
-    assign q8  = q[8];
-    assign q9  = q[9];
-    assign q10 = q[10];
-    assign q11 = q[11];
-    assign q12 = q[12];
-    assign q13 = q[13];
-    assign q14 = q[14];
-    assign q15 = q[15];
-
-    //assign ptr_rst_dly_n = ptr_rst_n;
-    //specify
-    //    specparam PATHPULSE$ = 0; // pulse reject and error limit
-    //    (ptr_rst_n => ptr_rst_dly_n) = (TDQSCK + TDQSQ, TDQSCK_MAX + TDQSQ + 2);
-    //endspecify
-endmodule
