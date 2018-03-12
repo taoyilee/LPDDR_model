@@ -2,7 +2,7 @@
 
 module tb;
 
-`include "mobile_ddr2_parameters.vh"
+`include "lpddr2_1GB_x16.v"
 
     // ports
     reg                         ck;
