@@ -83,7 +83,7 @@ module mobile_ddr2 (
     dqs,
     dqs_n
 );
-    `include "mobile_ddr2_parameters.vh"
+    `include "lpddr2_1GB_x16.v"
 
     `define DQ_PER_DQS DQ_BITS/DQS_BITS
     `define MAX_BITS   (BA_BITS+ROW_BITS+COL_BITS-1)

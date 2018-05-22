@@ -1,9 +1,11 @@
 initial begin : test
  integer i;
- parameter IFMAP_LEN = 1024;
- parameter OFMAP_LEN = 2048;
+ parameter FMAP_LEN0 = 1024;
+ parameter FMAP_LEN1 = 2048;
+ parameter FMAP_LEN2 = 2048;
+ parameter FMAP_LEN3 = 1024;
+ parameter FMAP_LEN4 = 512;
  parameter BURST_LEN = 4;
- parameter WIDTH = 32;
  parameter PRECISION = 8;
  reg [8*12:1] status;
  reg [9:0] ca_i;
@@ -33,7 +35,7 @@ initial begin : test
  status = "NOP";
  nop(trcd-1);
 
- for(i = 0; i < IFMAP_LEN*PRECISION/BURST_LEN/WIDTH; i = i + 1) begin
+ for(i = 0; i < FMAP_LEN0*PRECISION/BURST_LEN/DQ_BITS; i = i + 1) begin
 	 status = "WRITE";
 	 ca_i = 4*i;
 	 w0 = $random;
@@ -41,13 +43,13 @@ initial begin : test
 	 w2 = $random;
 	 w3 = $random;
  	 $display ("%m at time %t: Write %d to CA[]=0x%h", $time, i, ca_i);
- 	 write(0, ca_i, 0, 0, {w0[31:0], w2[31:0], w1[31:0], w0[31:0]});
+ 	 write(0, ca_i, 0, 0, {w0[DQ_BITS-1:0], w2[DQ_BITS-1:0], w1[DQ_BITS-1:0], w0[DQ_BITS-1:0]});
 	 nop(tccd-1);
  end
  //activate(0, 0);
  nop(twtr+2);
 
- for(i = 0; i < IFMAP_LEN*PRECISION/BURST_LEN/WIDTH; i = i+1) begin
+ for(i = 0; i < FMAP_LEN0*PRECISION/BURST_LEN/DQ_BITS; i = i+1) begin
  	 $display ("%m at time %t: Read %d to CA[]=0x%h", $time, i, ca_i);
 	 status = "READ";
 	 ca_i = 4*i;
@@ -56,6 +58,31 @@ initial begin : test
  end
  status = "NOP-RL";
  nop(rl+1);
+
+ for(i = 0; i < FMAP_LEN1*PRECISION/BURST_LEN/DQ_BITS; i = i + 1) begin
+	 status = "WRITE";
+	 ca_i = 4*i;
+	 w0 = $random;
+	 w1 = $random;
+	 w2 = $random;
+	 w3 = $random;
+ 	 $display ("%m at time %t: Write %d to CA[]=0x%h", $time, i, ca_i);
+ 	 write(0, ca_i, 0, 0, {w0[DQ_BITS-1:0], w2[DQ_BITS-1:0], w1[DQ_BITS-1:0], w0[DQ_BITS-1:0]});
+	 nop(tccd-1);
+ end
+ //activate(0, 0);
+ nop(twtr+2);
+
+ for(i = 0; i < FMAP_LEN1*PRECISION/BURST_LEN/DQ_BITS; i = i+1) begin
+ 	 $display ("%m at time %t: Read %d to CA[]=0x%h", $time, i, ca_i);
+	 status = "READ";
+	 ca_i = 4*i;
+	 read(0, ca_i[9:0], 0);
+	 nop(tccd-1);
+ end
+ status = "NOP-RL";
+ nop(rl+1);
+
  status = "NOP";
  nop(2);
  test_done;
