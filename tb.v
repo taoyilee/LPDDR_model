@@ -330,7 +330,7 @@ module tb;
     endtask
 
     // Test included from external file
-    `include "subtest.v"
+    `include "subtest_simple.v"
 
 endmodule
 
